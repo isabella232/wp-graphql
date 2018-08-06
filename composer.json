@@ -28,6 +28,8 @@
   },
   "require-dev": {
     "apigen/apigen": "^4.1",
+    "codeception/c3": "^2.4",
+    "codeception/codeception": "^2.4",
     "lucatume/wp-browser": "~1.21.20"
   },
   "config": {

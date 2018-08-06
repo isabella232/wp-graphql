@@ -4,6 +4,7 @@ services:
   tests:
     build:
       context: "./bin"
+      dockerfile: "Dockerfile-cli"
       args:
         PHP_VERSION: "${PHP_VERSION:-7.2}"
     depends_on:
@@ -16,7 +17,12 @@ services:
       - "test-suite:/tmp"
       - "./:/project"
   wpgraphql_test:
-    image: "wordpress:${WP_VERSION:-4.9.4}-php${PHP_VERSION:-7.2}-apache"
+    build:
+      context: "./bin"
+      dockerfile: "Dockerfile-test-web"
+      args:
+        PHP_VERSION: "${PHP_VERSION:-7.2}"
+        WP_VERSION: "${WP_VERSION:-4.9.4}"
     depends_on:
       - mysql_test
     environment:
