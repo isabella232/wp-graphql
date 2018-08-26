@@ -176,8 +176,8 @@ Code coverage for tests can be generated using `phpdbg` (note that Codeception c
 and PHP 7.2):
 
 ```
-docker-compose run --rm tests ./vendor/bin/codecept run acceptance --env docker --coverage --coverage-xml
-docker-compose run --rm tests ./vendor/bin/codecept run functional --env docker --coverage --coverage-xml
+docker-compose run --rm tests phpdbg -qrr ./vendor/bin/codecept run acceptance --env docker --coverage --coverage-xml
+docker-compose run --rm tests phpdbg -qrr ./vendor/bin/codecept run functional --env docker --coverage --coverage-xml
 docker-compose run --rm tests phpdbg -qrr ./vendor/bin/codecept run wpunit --env docker --coverage --coverage-xml
 ```
 
