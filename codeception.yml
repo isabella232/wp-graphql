@@ -6,7 +6,9 @@ paths:
     envs: tests/_envs
 actor_suffix: Tester
 coverage:
+    c3_url: http://wpgraphql.test/
     enabled: true
+    remote: false
     whitelist:
       include:
         - wp-graphql.php

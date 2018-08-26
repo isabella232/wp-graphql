@@ -1,0 +1,15 @@
+ARG PHP_VERSION
+
+ARG WP_VERSION
+
+FROM wordpress:${WP_VERSION}-php${PHP_VERSION}-apache
+
+RUN pecl install xdebug-2.6.1 \
+    && docker-php-ext-enable xdebug \
+    && rm -rf /tmp/pear/
+
+RUN { \
+      echo ''; \
+      echo 'xdebug.remote_enable=1'; \
+      echo 'xdebug.remote_port="9000"'; \
+    } >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
