@@ -267,7 +267,7 @@ if ( ! class_exists( 'WPGraphQL' ) ) :
 			/**
 			 * Determine what to show in graphql
 			 */
-			add_action( 'do_graphql_request', 'register_initial_settings', 10 );
+			add_action( '', 'register_initial_settings', 10 );
 			add_action( 'init_graphql_request', [ $this, 'setup_types' ], 10 );
 
 		}
@@ -279,7 +279,7 @@ if ( ! class_exists( 'WPGraphQL' ) ) :
 
 			/**
 			 * Only do this if we're in the context of a GraphQL request (note, this doesn't
-			 * mean just an HTTP request, but even an internal request via "do_graphql_request")
+			 * mean just an HTTP request, but even an internal request via "")
 			 */
 			if ( defined( 'GRAPHQL_REQUEST' ) && true === GRAPHQL_REQUEST ) {
 
@@ -755,48 +755,20 @@ if ( ! class_exists( 'WPGraphQL' ) ) :
 			/**
 			 * Run an action as soon when do_graphql_request begins.
 			 */
-			$helper = new \GraphQL\Server\Helper();
+			$helper = new \WPGraphQL\Server\WPHelper();
 			$parsed_request = $helper->parseHttpRequest();
 
 			/**
 			 * If the request is a batch request it will come back as an array
 			 */
-			if ( is_array( $parsed_request ) ) {
-
-				/**
-				 * Loop through the requests in the batch
-				 */
-				foreach ( $parsed_request as $request ) {
-					$query     = $request->query;
-					$operation = $request->operation;
-					$variables = $request->variables;
-
-					/**
-					 * Run an action as soon when do_graphql_request begins.
-					 *
-					 * @param string $request        The GraphQL request to be run
-					 * @param string $operation_name The name of the operation
-					 * @param string $variables      Variables to be passed to your GraphQL request
-					 */
-					do_action( 'do_graphql_request', $query, $operation, $variables );
-				}
-
-			} else {
-
-				$query     = isset( $parsed_request->query ) ? $parsed_request->query : '';
-				$operation = isset( $parsed_request->operation ) ? $parsed_request->operation : '';
-				$variables = isset( $parsed_request->variables ) ? $parsed_request->variables : '';
-
-				/**
-				 * Run an action as soon when do_graphql_request begins.
-				 *
-				 * @param string $request        The GraphQL request to be run
-				 * @param string $operation_name The name of the operation
-				 * @param string $variables      Variables to be passed to your GraphQL request
-				 */
-				do_action( 'do_graphql_request', $query, $operation, $variables );
+			if ( ! is_array( $parsed_request ) ) {
+				$parsed_request = [ $parsed_request ];
 			}
 
+			/**
+			 * Loop through the requests.
+			 */
+			array_walk( $parsed_request, [ self, 'dispatch_request' ] );
 
 			$config = new \GraphQL\Server\ServerConfig();
 			$config
@@ -819,6 +791,21 @@ if ( ! class_exists( 'WPGraphQL' ) ) :
 			}
 
 			return $server;
+		}
+
+		private static function dispatch_request( $request ) {
+			$query     = isset( $request->query )     ? $request->query     : '';
+			$operation = isset( $request->operation ) ? $request->operation : '';
+			$variables = isset( $request->variables ) ? $request->variables : '';
+
+			/**
+			 * Run an action for each request.
+			 *
+			 * @param string $query          The GraphQL query
+			 * @param string $operation_name The name of the operation
+			 * @param string $variables      Variables to be passed to your GraphQL request
+			 */
+			do_action( '', $query, $operation, $variables );
 		}
 
 	}

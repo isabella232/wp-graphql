@@ -312,14 +312,26 @@ class Router {
 	 * @return mixed
 	 */
 	public static function process_http_request() {
+		/**
+		 * Respond to pre-flight requests.
+		 *
+		 * @see: https://apollographql.slack.com/archives/C10HTKHPC/p1507649812000123
+		 * @see: https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS#Preflighted_requests
+		 */
+		if ( 'OPTIONS' === $_SERVER['REQUEST_METHOD'] ) {
+			self::$http_status_code = 200;
+			self::set_headers( self::$http_status_code );
+			exit;
+		}
 
 		/**
-		 * This action can be hooked to to enable various debug tools,
-		 * such as enableValidation from the GraphQL Config.
+		 * Store the global post so it can be reset after GraphQL execution
 		 *
-		 * @since 0.0.4
+		 * This allows for a GraphQL query to be used in the middle of post content, such as in a Shortcode
+		 * without disrupting the flow of the post as the global POST before and after GraphQL execution will be
+		 * the same.
 		 */
-		do_action( 'graphql_process_http_request' );
+		self::$global_post = ! empty( $GLOBALS['post'] ) ? $GLOBALS['post'] : null;
 
 		/**
 		 * Start the $response array to return for the response content
@@ -334,129 +346,8 @@ class Router {
 		$user            = null;
 
 		try {
-
-			/**
-			 * Store the global post so it can be reset after GraphQL execution
-			 *
-			 * This allows for a GraphQL query to be used in the middle of post content, such as in a Shortcode
-			 * without disrupting the flow of the post as the global POST before and after GraphQL execution will be
-			 * the same.
-			 */
-			self::$global_post = ! empty( $GLOBALS['post'] ) ? $GLOBALS['post'] : null;
-
-			/**
-			 * Respond to pre-flight requests.
-			 *
-			 * @see: https://apollographql.slack.com/archives/C10HTKHPC/p1507649812000123
-			 * @see: https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS#Preflighted_requests
-			 */
-			if ( 'OPTIONS' === $_SERVER['REQUEST_METHOD'] ) {
-
-				self::$http_status_code = 200;
-				self::set_headers( self::$http_status_code );
-				exit;
-
-			} else if ( isset( $_SERVER['REQUEST_METHOD'] ) && $_SERVER['REQUEST_METHOD'] === 'GET' ) {
-
-				$data = [
-					'query'         => isset( $_GET['query'] ) ? wp_kses_stripslashes( sanitize_text_field( $_GET['query'] ) ) : '',
-					'operationName' => isset( $_GET['operationName'] ) ? wp_kses_stripslashes( sanitize_text_field( $_GET['operationName'] ) ) : '',
-					'variables'     => isset( $_GET['variables'] ) ? $_GET['variables'] : '',
-				];
-
-				/**
-				 * Allow the data to be filtered
-				 *
-				 * @param array $data An array containing the pieces of the data of the GraphQL request
-				 */
-				$data = apply_filters( 'graphql_request_data', $data );
-
-				/**
-				 * If the variables are already formatted as an array use them.
-				 *
-				 * Example:
-				 * ?query=query getPosts($first:Int){posts(first:$first){edges{node{id}}}}&variables[first]=1
-				 */
-				if ( is_array( $data['variables'] ) ) {
-					$sanitized_variables = [];
-					foreach ( $data['variables'] as $key => $value ) {
-						$sanitized_variables[ $key ] = sanitize_text_field( $value );
-					}
-					$decoded_variables = $sanitized_variables;
-
-					/**
-					 * If the variables are not an array, let's attempt to decode them and convert them to an array for
-					 * use in the executor.
-					 */
-				} else {
-					$decoded_variables = json_decode( wp_kses_stripslashes( $data['variables'] ), true );
-				}
-
-				$data['variables'] = ! empty( $decoded_variables ) && is_array( $decoded_variables ) ? $decoded_variables : null;
-
-
-				/**
-				 * Allow the data to be filtered
-				 *
-				 * @param array $data An array containing the pieces of the data of the GraphQL request
-				 */
-				$data = apply_filters( 'graphql_request_data', $data );
-
-				/**
-				 * Get the pieces of the request from the data
-				 */
-				$request        = isset( $data['query'] ) ? $data['query'] : '';
-				$operation_name = isset( $data['operationName'] ) ? $data['operationName'] : '';
-				$variables      = isset( $data['variables'] ) ? $data['variables'] : [];
-
-
-				if ( false === headers_sent() ) {
-					self::prepare_headers( $response, $graphql_results, $request, $operation_name, $variables, $user );
-				}
-
-				/**
-				 * Process the GraphQL request
-				 *
-				 * @since 0.0.5
-				 */
-				$graphql_results = do_graphql_request( $request, $operation_name, $variables );
-
-				/**
-				 * Ensure the $graphql_request is returned as a proper, populated array,
-				 * otherwise add an error to the result
-				 */
-				if ( ! empty( $graphql_results ) && is_array( $graphql_results ) ) {
-					$response = $graphql_results;
-				} else {
-					$response['errors'] = __( 'The GraphQL request returned an invalid response', 'wp-graphql' );
-				}
-
-				self::after_execute( $response, $operation_name, $request, $variables, $graphql_results );
-
-			} else {
-
-				/**
-				 * If headers haven't been sent already, let's set the headers and return the JSON response
-				 */
-				if ( false === headers_sent() ) {
-
-					self::prepare_headers( $response, $graphql_results, $request, $operation_name, $variables, $user );
-
-					/**
-					 * Send the JSON response
-					 */
-					$server   = \WPGraphQL::server();
-					$response = $server->executeRequest();
-
-					$helper  = new \GraphQL\Server\Helper();
-					$request = $helper->parseHttpRequest();
-
-					self::after_execute( $response, $operation_name, $request, $variables, $graphql_results );
-
-				}
-
-			}
-
+			$request = new Request();
+			$request::process();
 		} catch ( \Exception $error ) {
 
 			/**
