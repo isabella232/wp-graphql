@@ -25,6 +25,110 @@ class Request {
 		do_action( 'graphql_process_http_request' );
 	}
 
+	/**
+	 * Initialize the GraphQL Request.
+	 *
+	 * This defines that the Request is a GraphQL Request and fires off the
+	 * `init_graphql_request` hook which is a great place for plugins to hook
+	 * in and modify things that should only occur in the context
+	 * of a GraphQL Request.
+	 */
+	protected static function init_graphql_request() {
+
+		/**
+		 * Whether it's a GraphQL Request (http or internal)
+		 *
+		 * @since 0.0.5
+		 */
+		if ( ! defined( 'GRAPHQL_REQUEST' ) ) {
+			define( 'GRAPHQL_REQUEST', true );
+		}
+
+		/**
+		 * Action – intentionally with no context – to indicate a GraphQL Request has started
+		 */
+		do_action( 'init_graphql_request' );
+
+	}
+
+	/**
+	 * @param null $request
+	 *
+	 * @return \GraphQL\Server\StandardServer
+	 * @throws \GraphQL\Server\RequestError
+	 */
+	public static function server( $request = null ) {
+
+		/**
+		 * Initialize the GraphQL Request
+		 */
+		self::init_graphql_request();
+
+		/**
+		 * Store the global post so it can be reset after GraphQL execution
+		 *
+		 * This allows for a GraphQL query to be used in the middle of post content, such as in a Shortcode
+		 * without disrupting the flow of the post as the global POST before and after GraphQL execution will be
+		 * the same.
+		 */
+		$global_post = ! empty( $GLOBALS['post'] ) ? $GLOBALS['post'] : null;
+
+		/**
+		 * Run an action as soon when do_graphql_request begins.
+		 */
+		$helper = new \WPGraphQL\Server\WPHelper();
+		$parsed_request = $helper->parseHttpRequest();
+
+		/**
+		 * If the request is a batch request it will come back as an array
+		 */
+		if ( ! is_array( $parsed_request ) ) {
+			$parsed_request = [ $parsed_request ];
+		}
+
+		/**
+		 * Loop through the requests.
+		 */
+		//array_walk( $parsed_request, [ self, 'dispatch_request' ] );
+
+		$config = new \GraphQL\Server\ServerConfig();
+		$config
+			->setDebug( GRAPHQL_DEBUG )
+			->setSchema( \WPGraphQL::get_schema() )
+			->setContext( \WPGraphQL::get_app_context() )
+			->setQueryBatching( true );
+
+		$server = new \GraphQL\Server\StandardServer( $config );
+
+		/**
+		 * Reset the global post after execution
+		 *
+		 * This allows for a GraphQL query to be used in the middle of post content, such as in a Shortcode
+		 * without disrupting the flow of the post as the global POST before and after GraphQL execution will be
+		 * the same.
+		 */
+		if ( ! empty( $global_post ) ) {
+			$GLOBALS['post'] = $global_post;
+		}
+
+		return $server;
+	}
+
+	private static function dispatch_request( $request ) {
+		$query     = isset( $request->query )     ? $request->query     : '';
+		$operation = isset( $request->operation ) ? $request->operation : '';
+		$variables = isset( $request->variables ) ? $request->variables : '';
+
+		/**
+		 * Run an action for each request.
+		 *
+		 * @param string $query          The GraphQL query
+		 * @param string $operation_name The name of the operation
+		 * @param string $variables      Variables to be passed to your GraphQL request
+		 */
+		do_action( '', $query, $operation, $variables );
+	}
+
 	private static function before_execute() {
 		/**
 		 * Store the global post so it can be reset after GraphQL execution
@@ -152,12 +256,6 @@ class Request {
 			$decoded_variables = json_decode( wp_kses_stripslashes( $data['variables'] ), true );
 		}
 
-		if ( false === headers_sent() ) {
-			self::prepare_headers( $response, $graphql_results, $request, $operation_name, $variables, $user );
-		}
-
-
-
 		/**
 		 * Ensure the $graphql_request is returned as a proper, populated array,
 		 * otherwise add an error to the result
@@ -168,8 +266,6 @@ class Request {
 			$response['errors'] = __( 'The GraphQL request returned an invalid response', 'wp-graphql' );
 		}
 
-		self::after_execute( $response, $operation_name, $request, $variables, $graphql_results );
-
 		/**
 		 * Allow the data to be filtered
 		 *
@@ -177,27 +273,19 @@ class Request {
 		 */
 		$data = apply_filters( 'graphql_request_data', $data );
 
+		do_action( 'init_graphql_request' );
 		/**
 		 * Send the JSON response
 		 */
-		$server   = \WPGraphQL::server();
+		$server   = self::server();
 		$response = $server->executeRequest();
 
 		$helper = $server->getHelper();
 		$request = $helper->parseHttpRequest();
 
 		self::after_execute( $response, $operation_name, $request, $variables, $graphql_results );
-	}
 
-	/**
-	 * Given a Schema Name, returns the Schema associated with it
-	 *
-	 * @param string $schema_name The name of the Schema to return
-	 *
-	 * @return array|mixed
-	 */
-	public static function get_schema( $schema_name ) {
-		return ! empty( self::$schemas[ $schema_name ] ) && is_array( self::$schemas[ $schema_name ] ) ? self::$schemas[ $schema_name ] : [];
+		return $response;
 	}
 
 	/**

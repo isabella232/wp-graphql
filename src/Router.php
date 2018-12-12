@@ -334,9 +334,13 @@ class Router {
 			 */
 			self::$http_status_code = 500;
 			$response = [
-				'errors' = [ FormattedError::createFromException( $error ) ],
+				'errors' => [ FormattedError::createFromException( $error ) ],
 			];
 		} // End try().
+
+		if ( false === headers_sent() ) {
+			self::prepare_headers( $response, $graphql_results, $request, $operation_name, $variables, $user );
+		}
 
 		/**
 		 * Send the response

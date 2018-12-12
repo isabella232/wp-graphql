@@ -581,32 +581,6 @@ if ( ! class_exists( 'WPGraphQL' ) ) :
 		}
 
 		/**
-		 * Initialize the GraphQL Request.
-		 *
-		 * This defines that the Request is a GraphQL Request and fires off the
-		 * `init_graphql_request` hook which is a great place for plugins to hook
-		 * in and modify things that should only occur in the context
-		 * of a GraphQL Request.
-		 */
-		protected static function init_graphql_request() {
-
-			/**
-			 * Whether it's a GraphQL Request (http or internal)
-			 *
-			 * @since 0.0.5
-			 */
-			if ( ! defined( 'GRAPHQL_REQUEST' ) ) {
-				define( 'GRAPHQL_REQUEST', true );
-			}
-
-			/**
-			 * Action – intentionally with no context – to indicate a GraphQL Request has started
-			 */
-			do_action( 'init_graphql_request' );
-
-		}
-
-		/**
 		 * This processes a GraphQL request, given a $request and optional $variables
 		 *
 		 * This function is used to resolve the HTTP requests for the GraphQL API, but can also be
@@ -728,84 +702,6 @@ if ( ! class_exists( 'WPGraphQL' ) ) :
 			 */
 			return $result->toArray( GRAPHQL_DEBUG );
 
-		}
-
-		/**
-		 * @param null $request
-		 *
-		 * @return \GraphQL\Server\StandardServer
-		 * @throws \GraphQL\Server\RequestError
-		 */
-		public static function server( $request = null ) {
-
-			/**
-			 * Initialize the GraphQL Request
-			 */
-			self::init_graphql_request();
-
-			/**
-			 * Store the global post so it can be reset after GraphQL execution
-			 *
-			 * This allows for a GraphQL query to be used in the middle of post content, such as in a Shortcode
-			 * without disrupting the flow of the post as the global POST before and after GraphQL execution will be
-			 * the same.
-			 */
-			$global_post = ! empty( $GLOBALS['post'] ) ? $GLOBALS['post'] : null;
-
-			/**
-			 * Run an action as soon when do_graphql_request begins.
-			 */
-			$helper = new \WPGraphQL\Server\WPHelper();
-			$parsed_request = $helper->parseHttpRequest();
-
-			/**
-			 * If the request is a batch request it will come back as an array
-			 */
-			if ( ! is_array( $parsed_request ) ) {
-				$parsed_request = [ $parsed_request ];
-			}
-
-			/**
-			 * Loop through the requests.
-			 */
-			array_walk( $parsed_request, [ self, 'dispatch_request' ] );
-
-			$config = new \GraphQL\Server\ServerConfig();
-			$config
-				->setDebug( GRAPHQL_DEBUG )
-				->setSchema( self::get_schema() )
-				->setContext( self::get_app_context() )
-				->setQueryBatching( true );
-
-			$server = new \GraphQL\Server\StandardServer( $config );
-
-			/**
-			 * Reset the global post after execution
-			 *
-			 * This allows for a GraphQL query to be used in the middle of post content, such as in a Shortcode
-			 * without disrupting the flow of the post as the global POST before and after GraphQL execution will be
-			 * the same.
-			 */
-			if ( ! empty( $global_post ) ) {
-				$GLOBALS['post'] = $global_post;
-			}
-
-			return $server;
-		}
-
-		private static function dispatch_request( $request ) {
-			$query     = isset( $request->query )     ? $request->query     : '';
-			$operation = isset( $request->operation ) ? $request->operation : '';
-			$variables = isset( $request->variables ) ? $request->variables : '';
-
-			/**
-			 * Run an action for each request.
-			 *
-			 * @param string $query          The GraphQL query
-			 * @param string $operation_name The name of the operation
-			 * @param string $variables      Variables to be passed to your GraphQL request
-			 */
-			do_action( '', $query, $operation, $variables );
 		}
 
 	}

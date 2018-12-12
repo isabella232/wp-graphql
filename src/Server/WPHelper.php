@@ -39,6 +39,13 @@ class WPHelper extends Helper {
 	}
 
 	private function parse_extensions( $params ) {
+		if (is_string($params['extensions'])) {
+			$tmp = json_decode(stripslashes( $params['extensions'] ), true);
+			if (! json_last_error()) {
+				$params['extensions'] = $tmp;
+			}
+		}
+
 		if ( isset( $params['extensions']['persistedQuery']['sha256Hash'] ) && ! isset( $params['query'] ) ) {
 			$params['queryId'] = $params['extensions']['persistedQuery']['sha256Hash'];
 		}
