@@ -323,7 +323,7 @@ class Router {
 
 		try {
 			$request = new Request();
-			$response = $request::process();
+			$response = $request->execute_http();
 		} catch ( \Exception $error ) {
 
 			/**
@@ -341,6 +341,21 @@ class Router {
 		if ( false === headers_sent() ) {
 			self::prepare_headers( $response, $graphql_results, $request, $operation_name, $variables, $user );
 		}
+
+		/**
+		 * Run an action after the HTTP Response is ready to be sent back. This might be a good place for tools
+		 * to hook in to track metrics, such as how long the process took from `graphql_process_http_request`
+		 * to here, etc.
+		 *
+		 * @param array  $result          The result of the GraphQL Query
+		 * @param array  $filtered_result The result, passed through filters
+		 * @param string $operation_name  The name of the operation
+		 * @param string $request         The request that GraphQL executed
+		 * @param array  $variables       Variables to passed to your GraphQL query
+		 *
+		 * @since 0.0.5
+		 */
+		do_action( 'graphql_process_http_request_response', $filtered_result, $result, $operation_name, $request, $variables );
 
 		/**
 		 * Send the response
