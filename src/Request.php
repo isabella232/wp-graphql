@@ -5,6 +5,7 @@ namespace WPGraphQL;
 use GraphQL\Server\OperationParams;
 use GraphQL\Server\ServerConfig;
 use GraphQL\Server\StandardServer;
+use WPGraphQL\Server\PersistedQueries;
 use WPGraphQL\Server\WPHelper;
 
 /**
@@ -169,6 +170,11 @@ class Request {
 		do_action( 'graphql_return_response', $filtered_response, $response, $this->schema, $this->params->operation, $this->params->query, $this->params->variables );
 
 		/**
+		 * Persist the query (if enabled).
+		 */
+		PersistedQueries::save( $query, $this->params );
+
+		/**
 		 * Reset the global post after execution
 		 *
 		 * This allows for a GraphQL query to be used in the middle of post content, such as in a Shortcode
@@ -213,6 +219,14 @@ class Request {
 		 * Initialize the GraphQL Request
 		 */
 		$this->before_execute();
+
+		/**
+		 * If a query ID has been provided, attempt to load persisted query.
+		 */
+		$query = $this->params->query;
+		if ( isset( $this->params->queryId ) ) {
+			$query = PersistedQueries::load( $this->params->queryId, $this->params );
+		}
 
 		$result = \GraphQL\GraphQL::executeQuery(
 			$this->schema,
@@ -289,6 +303,7 @@ class Request {
 			->setDebug( GRAPHQL_DEBUG )
 			->setSchema( $this->schema )
 			->setContext( $this->app_context )
+			->setPersistentQueryLoader( [ 'PersistedQueries', 'load' ] )
 			->setQueryBatching( true );
 
 		$server = new StandardServer( $config );

@@ -240,6 +240,7 @@ if ( ! class_exists( 'WPGraphQL' ) ) :
 			add_action( 'after_setup_theme', function () {
 
 				new \WPGraphQL\Data\Config();
+				new \WPGraphQL\Server\PersistedQueries();
 				new \WPGraphQL\Router();
 
 				/**
