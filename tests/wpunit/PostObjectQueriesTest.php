@@ -296,6 +296,68 @@ class PostObjectQueriesTest extends \Codeception\TestCase\WPTestCase {
 	}
 
 	/**
+	 * testPostQueryWherePostIsWrongPostType
+	 *
+	 * Tests a query for a post in a different post type.
+	 *
+	 * @since 0.2.2
+	 */
+	public function testPostQueryWherePostIsWrongPostType() {
+		/**
+		 * Create a page
+		 */
+		$post_id = $this->createPostObject( [
+			'post_type' => 'page',
+		] );
+
+		/**
+		 * Create the global ID based on the post_type and the created $id
+		 */
+		$global_id = \GraphQLRelay\Relay::toGlobalId( 'post', $post_id );
+
+		/**
+		 * Create the query string to pass to the $query
+		 */
+		$query = "
+ 		query {
+			post(id: \"{$global_id}\") {
+				slug
+			}
+		}";
+
+		/**
+		 * Run the GraphQL query
+		 */
+		$actual = do_graphql_request( $query );
+
+		/**
+		 * Establish the expectation for the output of the query
+		 */
+		$expected = [
+			'data'   => [
+				'post' => null,
+			],
+			'errors' => [
+				[
+					'message'   => "No post was found with the ID: {$post_id}",
+					'locations' => [
+						[
+							'line'   => 3,
+							'column' => 4,
+						],
+					],
+					'path'      => [
+						'post',
+					],
+					'category'  => 'user',
+				],
+			],
+		];
+
+		$this->assertEquals( $expected, $actual );
+	}
+
+	/**
 	 * testPostQueryWithoutFeaturedImage
 	 *
 	 * This tests querying featuredImage on a post wihtout one.
